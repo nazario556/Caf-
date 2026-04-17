@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amor Por Café - Interactive Digital Menu</title>
+    
+    <!-- Chosen Palette: Warm Cafe Neutrals (Stone, Amber, Emerald for accents, deep brown for text) -->
+    <!-- Application Structure Plan: A two-panel dashboard layout. The left panel serves as an interactive, filterable digital menu allowing users to explore categories. The right panel is an "Analytics & Planning" tray that builds a dynamic order, showing real-time price totals and a Chart.js visualization of the order's cost distribution or menu averages. This structure shifts the user from passive reading to active exploration and budget planning. -->
+    <!-- Visualization & Content Choices: Menu Data -> Goal: Explore & Compare -> Viz: Dynamic List & Chart.js Doughnut/Bar -> Interaction: Add to tray, filter by category -> Justification: Allows users to see the menu contextually while understanding the financial breakdown of their choices visually. Chart.js provides smooth canvas rendering without SVG. -> Library: Chart.js -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;1,600&family=Source+Sans+Pro:wght@400;600&display=swap');
+        
+        body {
+            font-family: 'Source Sans Pro', sans-serif;
+            background-color: #fdfbf7;
+            color: #3e2723;
+        }
+        
+        h1, h2, h3, .brand-font {
+            font-family: 'Playfair Display', serif;
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 40vh;
+            max-height: 400px;
+        }
+        
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+
+        .menu-item-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .menu-item-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f5f5f4;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #d6d3d1;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <header class="bg-[#4e342e] text-[#fdfbf7] py-6 shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold tracking-wider">AMOR POR CAFÉ</h1>
+                <p class="text-sm text-[#d7ccc8] uppercase tracking-widest mt-1">Emporium & Coffee Shop</p>
+            </div>
+            <div class="text-3xl" aria-hidden="true">&#9749;</div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        <div class="mb-8 max-w-3xl">
+            <h2 class="text-2xl font-bold mb-3 text-[#5d4037]">Welcome to our Interactive Experience</h2>
+            <p class="text-[#5d4037] leading-relaxed">
+                Explore the authentic flavors of Brazil and classic cafe staples. Use the interactive menu below to filter by your cravings, discover our ingredients, and build your ideal tray. As you add items, the analytics panel will dynamically visualize the composition and total value of your selection.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <section class="lg:col-span-7 flex flex-col h-[75vh]">
+                <div class="bg-white rounded-t-xl shadow-sm border-b border-stone-100 p-4">
+                    <h3 class="text-xl font-bold mb-2">Explore the Menu</h3>
+                    <p class="text-sm text-stone-500 mb-4">Select a category to filter items. Click any item to add it to your tray.</p>
+                    <div id="category-filters" class="flex flex-wrap gap-2">
+                    </div>
+                </div>
+
+                <div id="menu-container" class="bg-stone-50 flex-grow overflow-y-auto custom-scrollbar p-4 rounded-b-xl shadow-inner border border-stone-200 grid grid-cols-1 md:grid-cols-2 gap-4 content-start">
+                </div>
+            </section>
+
+            <section class="lg:col-span-5 flex flex-col gap-6">
+                
+                <div class="bg-white p-6 rounded-xl shadow-md border border-stone-200">
+                    <h3 class="text-xl font-bold mb-2 border-b border-stone-200 pb-2 flex justify-between items-center">
+                        <span>Your Tray</span>
+                        <span id="tray-total" class="text-amber-700 font-bold">R$ 0.00</span>
+                    </h3>
+                    <p class="text-sm text-stone-500 mb-4">Review your selected items and total budget here.</p>
+                    
+                    <div id="tray-container" class="min-h-[150px] max-h-[250px] overflow-y-auto custom-scrollbar mb-4 space-y-2">
+                        <div class="text-stone-400 italic text-center py-8">Your tray is currently empty.</div>
+                    </div>
+                    
+                    <button id="clear-tray-btn" class="w-full py-2 bg-stone-200 hover:bg-stone-300 text-stone-700 font-semibold rounded transition-colors hidden">
+                        Clear Tray
+                    </button>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-md border border-stone-200 flex-grow flex flex-col">
+                    <h3 class="text-xl font-bold mb-2">Order Analytics</h3>
+                    <p id="chart-description" class="text-sm text-stone-500 mb-4">
+                        Showing the average price across all our menu categories. Add items to your tray to see your specific order breakdown.
+                    </p>
+                    
+                    <div class="flex-grow flex items-center justify-center">
+                        <div class="chart-container">
+                            <canvas id="menuChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+        </div>
+    </main>
+
+    <footer class="bg-[#3e2723] text-stone-400 py-6 text-center text-sm mt-8">
+        <p>Amor Por Café Interactive Architecture | All prices in Brazilian Real (R$)</p>
+    </footer>
+
+    <script>
+        const menuData = [
+            { id: 1, category: "Classic Hot Coffees", name: "Short Espresso", price: 6.50, desc: "40ml", icon: "&#9749;" },
+            { id: 2, category: "Classic Hot Coffees", name: "Carioca Coffee", price: 8.00, desc: "150ml - Longer espresso with a touch of hot water", icon: "&#9749;" },
+            { id: 3, category: "Classic Hot Coffees", name: "Traditional Italian Cappuccino", price: 11.00, desc: "200ml", icon: "&#9749;" },
+            { id: 4, category: "Classic Hot Coffees", name: "Cinnamon Cappuccino", price: 13.00, desc: "200ml", icon: "&#9749;" },
+            { id: 5, category: "Classic Hot Coffees", name: "Chocolate Cappuccino", price: 13.00, desc: "200ml", icon: "&#9749;" },
+            { id: 6, category: "Classic Hot Coffees", name: "Caramel Cappuccino", price: 12.00, desc: "200ml", icon: "&#9749;" },
+            { id: 7, category: "Classic Hot Coffees", name: "Latte Macchiato", price: 11.00, desc: "200ml", icon: "&#9749;" },
+            { id: 8, category: "Classic Hot Coffees", name: "Traditional Hot Chocolate", price: 16.00, desc: "200ml", icon: "&#9749;" },
+            { id: 9, category: "Classic Hot Coffees", name: "Coffee Hot Chocolate", price: 18.00, desc: "200ml", icon: "&#9749;" },
+            { id: 10, category: "Classic Hot Coffees", name: "White Chocolate Coffee", price: 20.00, desc: "200ml", icon: "&#9749;" },
+            
+            { id: 11, category: "House Specials", name: "The 'Mineirinho'", price: 14.00, desc: "200ml - Honey, paçoca (peanut candy), short espresso, and steamed milk", icon: "&#11088;" },
+            { id: 12, category: "House Specials", name: "The 'Pernambucano'", price: 15.00, desc: "200ml - Cane syrup, cinnamon, short espresso, steamed milk, touch of coalho cheese", icon: "&#11088;" },
+            
+            { id: 13, category: "Savory Sandwiches", name: "The 'Gaúcho'", price: 16.00, desc: "Salami, cream cheese, and grilled cheese", icon: "&#129386;" },
+            { id: 14, category: "Savory Sandwiches", name: "The 'Sertanejo'", price: 14.00, desc: "Jerked beef, coalho cheese, lettuce, tomato, house sauce", icon: "&#129386;" },
+            { id: 15, category: "Savory Sandwiches", name: "The 'Paulistano'", price: 15.00, desc: "Mayo and smoked Bologna sausage", icon: "&#129386;" },
+            
+            { id: 16, category: "Gourmet Toasts", name: "Two Cheeses", price: 24.00, desc: "Italian bread, Parmesan, do Reino cheese, arugula, berry jam, orange marmalade", icon: "&#127838;" },
+            { id: 17, category: "Gourmet Toasts", name: "Egg & Grains", price: 20.00, desc: "Italian bread, cream cheese, 2 fried eggs, oats, sesame, almonds, chives", icon: "&#127838;" },
+            { id: 18, category: "Gourmet Toasts", name: "Caramelized Banana", price: 14.00, desc: "Italian bread, dulce de leche, cinnamon, caramelized banana", icon: "&#127838;" },
+            { id: 19, category: "Gourmet Toasts", name: "Romeo & Juliet", price: 16.00, desc: "Italian bread, guava paste, Parmesan, coalho cheese", icon: "&#127838;" },
+            
+            { id: 20, category: "Desserts", name: "Affogato", price: 18.00, desc: "Vanilla ice cream, cookies, dulce de leche, short espresso shot", icon: "&#127846;" },
+            { id: 21, category: "Desserts", name: "Pernambuco Petit Gâteau", price: 20.00, desc: "Warm Bolo de Rolo, vanilla ice cream, do Reino cheese shavings", icon: "&#127856;" },
+            { id: 22, category: "Desserts", name: "Cartola", price: 24.00, desc: "Grilled banana and coalho cheese topped with sugar and cinnamon", icon: "&#127820;" }
+        ];
+
+        const state = {
+            currentCategory: "All",
+            tray: [],
+            chartInstance: null
+        };
+
+        const domElements = {
+            filters: document.getElementById('category-filters'),
+            menuContainer: document.getElementById('menu-container'),
+            trayContainer: document.getElementById('tray-container'),
+            trayTotal: document.getElementById('tray-total'),
+            clearTrayBtn: document.getElementById('clear-tray-btn'),
+            chartCanvas: document.getElementById('menuChart'),
+            chartDesc: document.getElementById('chart-description')
+        };
+
+        function init() {
+            renderFilters();
+            renderMenu();
+            updateTrayUI();
+            updateAnalytics();
+            
+            domElements.clearTrayBtn.addEventListener('click', () => {
+                state.tray = [];
+                updateTrayUI();
+                updateAnalytics();
+            });
+        }
+
+        function getCategories() {
+            const cats = ["All"];
+            menuData.forEach(item => {
+                if (!cats.includes(item.category)) cats.push(item.category);
+            });
+            return cats;
+        }
+
+        function renderFilters() {
+            const categories = getCategories();
+            domElements.filters.innerHTML = '';
+            
+            categories.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.className = `px-4 py-2 rounded-full text-sm font-semibold transition-colors ${state.currentCategory === cat ? 'bg-amber-700 text-white' : 'bg-stone-200 text-stone-700 hover:bg-stone-300'}`;
+                btn.textContent = cat;
+                btn.onclick = () => {
+                    state.currentCategory = cat;
+                    renderFilters();
+                    renderMenu();
+                };
+                domElements.filters.appendChild(btn);
+            });
+        }
+
+        function renderMenu() {
+            domElements.menuContainer.innerHTML = '';
+            
+            const filteredData = state.currentCategory === "All" 
+                ? menuData 
+                : menuData.filter(item => item.category === state.currentCategory);
+                
+            filteredData.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'menu-item-card bg-white p-4 rounded-lg border border-stone-200 cursor-pointer flex flex-col justify-between';
+                card.onclick = () => addToTray(item);
+                
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="font-bold text-lg text-[#4e342e] leading-tight pr-2">
+                                <span class="mr-1" aria-hidden="true">${item.icon}</span>${item.name}
+                            </h4>
+                            <span class="font-bold text-amber-700 whitespace-nowrap">R$ ${item.price.toFixed(2)}</span>
+                        </div>
+                        <p class="text-sm text-stone-600 mb-3">${item.desc}</p>
+                    </div>
+                    <div class="text-xs font-semibold text-stone-400 uppercase tracking-wider">${item.category}</div>
+                `;
+                
+                domElements.menuContainer.appendChild(card);
+            });
+        }
+
+        function addToTray(item) {
+            state.tray.push({...item, trayId: Date.now() + Math.random()});
+            updateTrayUI();
+            updateAnalytics();
+        }
+
+        function removeFromTray(trayId) {
+            state.tray = state.tray.filter(item => item.trayId !== trayId);
+            updateTrayUI();
+            updateAnalytics();
+        }
+
+        function updateTrayUI() {
+            domElements.trayContainer.innerHTML = '';
+            
+            if (state.tray.length === 0) {
+                domElements.trayContainer.innerHTML = '<div class="text-stone-400 italic text-center py-8">Your tray is currently empty.</div>';
+                domElements.trayTotal.textContent = 'R$ 0.00';
+                domElements.clearTrayBtn.classList.add('hidden');
+                return;
+            }
+            
+            domElements.clearTrayBtn.classList.remove('hidden');
+            let total = 0;
+            
+            state.tray.forEach(item => {
+                total += item.price;
+                const row = document.createElement('div');
+                row.className = 'flex justify-between items-center p-2 bg-stone-50 border border-stone-100 rounded text-sm';
+                row.innerHTML = `
+                    <div class="truncate pr-2 flex-grow font-semibold text-[#4e342e]">${item.name}</div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-amber-700">R$ ${item.price.toFixed(2)}</span>
+                        <button class="text-red-400 hover:text-red-600 font-bold px-1" onclick="removeFromTray(${item.trayId})" title="Remove item">&times;</button>
+                    </div>
+                `;
+                domElements.trayContainer.appendChild(row);
+            });
+            
+            domElements.trayTotal.textContent = `R$ ${total.toFixed(2)}`;
+            domElements.trayContainer.scrollTop = domElements.trayContainer.scrollHeight;
+        }
+
+        function getChartColors(count) {
+            const baseColors = [
+                '#8d6e63', '#d4e157', '#ffa726', '#ff7043', '#26a69a', '#5c6bc0', '#ec407a'
+            ];
+            const colors = [];
+            for(let i=0; i<count; i++) {
+                colors.push(baseColors[i % baseColors.length]);
+            }
+            return colors;
+        }
+
+        function wrapLabels(labels, maxChar) {
+            return labels.map(label => {
+                if (label.length <= maxChar) return label;
+                const words = label.split(' ');
+                let lines = [];
+                let currentLine = '';
+                words.forEach(word => {
+                    if ((currentLine + word).length > maxChar) {
+                        lines.push(currentLine.trim());
+                        currentLine = word + ' ';
+                    } else {
+                        currentLine += word + ' ';
+                    }
+                });
+                lines.push(currentLine.trim());
+                return lines;
+            });
+        }
+
+        function updateAnalytics() {
+            if (state.chartInstance) {
+                state.chartInstance.destroy();
+            }
+
+            const ctx = domElements.chartCanvas.getContext('2d');
+            
+            Chart.defaults.font.family = "'Source Sans Pro', sans-serif";
+            Chart.defaults.color = '#78716c';
+
+            if (state.tray.length === 0) {
+                domElements.chartDesc.textContent = "Showing the average price across all our menu categories. Add items to your tray to see your specific order breakdown.";
+                
+                const categoryStats = {};
+                menuData.forEach(item => {
+                    if(!categoryStats[item.category]) categoryStats[item.category] = {sum: 0, count: 0};
+                    categoryStats[item.category].sum += item.price;
+                    categoryStats[item.category].count++;
+                });
+
+                const labels = Object.keys(categoryStats);
+                const data = labels.map(label => categoryStats[label].sum / categoryStats[label].count);
+                const bgColors = getChartColors(labels.length);
+
+                state.chartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: wrapLabels(labels, 16),
+                        datasets: [{
+                            label: 'Average Price (R$)',
+                            data: data,
+                            backgroundColor: bgColors,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return ' Avg Price: R$ ' + context.parsed.y.toFixed(2);
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Price (R$)' }
+                            },
+                            x: {
+                                ticks: { maxRotation: 45, minRotation: 45 }
+                            }
+                        }
+                    }
+                });
+
+            } else {
+                domElements.chartDesc.textContent = "Your tray's total cost broken down by category.";
+                
+                const trayStats = {};
+                state.tray.forEach(item => {
+                    if(!trayStats[item.category]) trayStats[item.category] = 0;
+                    trayStats[item.category] += item.price;
+                });
+
+                const labels = Object.keys(trayStats);
+                const data = labels.map(label => trayStats[label]);
+                const bgColors = getChartColors(labels.length);
+
+                state.chartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: wrapLabels(labels, 20),
+                        datasets: [{
+                            data: data,
+                            backgroundColor: bgColors,
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '60%',
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: { boxWidth: 12, padding: 15 }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const value = context.parsed;
+                                        const percentage = ((value / total) * 100).toFixed(1);
+                                        return ` R$ ${value.toFixed(2)} (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
